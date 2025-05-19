@@ -1,0 +1,21 @@
+---
+
+min_ansible_version: 2.10.1
+amzn2023cis_allowed_crypto_policies:
+    - 'DEFAULT'
+    - 'FUTURE'
+    - 'FIPS'
+
+amzn2023cis_allowed_crypto_policies_modules:
+    - 'OSPP'
+    - 'AD-SUPPORT'
+    - 'AD-SUPPORT-LEGACY'
+
+# Used to control warning summary
+warn_control_list: ""
+warn_count: 0
+
+gpg_key_package: "system-release"
+
+os_gpg_key_pubkey_name: gpg-pubkey-d832c631-6515c85e # Coalfire Edit: Original value seemed inaccurate. https://docs.aws.amazon.com/linux/al2023/release-notes/relnotes-2023.2.20231011.html
+os_gpg_key_pubkey_content: "Amazon Linux <amazon-linux@amazon.com> d832c631"

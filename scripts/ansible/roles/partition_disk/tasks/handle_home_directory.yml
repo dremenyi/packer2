@@ -1,0 +1,58 @@
+---
+- name: Create temporary mount point for home
+  ansible.builtin.shell: |
+    mkdir -p /mnt/home_temp
+    chmod 755 /mnt/home_temp
+  args:
+    executable: /bin/bash
+
+- name: Mount new home volume to temp location
+  ansible.builtin.shell: |
+    mount /dev/mapper/disk2vg-{{ directories.home.fstab_entry }} /mnt/home_temp
+  args:
+    executable: /bin/bash
+
+- name: Copy home directory contents
+  ansible.builtin.shell: |
+    cd /home
+    cp -ax * /mnt/home_temp/ || true
+  args:
+    executable: /bin/bash
+  ignore_errors: true
+
+- name: Setup new home directory
+  ansible.builtin.shell: |
+    # Kill any processes using /home
+    lsof | grep /home | awk '{print $2}' | xargs -r kill || true
+    fuser -k /home || true
+    sleep 2
+
+    # Unmount if already mounted
+    umount -f /home || true
+    
+    # Backup current home
+    mv /home /home_old || true
+    
+    # Create new home
+    mkdir -p /home
+    chmod 755 /home
+    chown root:root /home
+    
+    # Mount new volume
+    umount -f /mnt/home_temp || true
+    mount /dev/mapper/disk2vg-{{ directories.home.fstab_entry }} /home
+    
+    # Add to fstab
+    echo "/dev/mapper/disk2vg-{{ directories.home.fstab_entry }} /home xfs {{ directories.home.opts }} 0 0" >> /etc/fstab
+    
+    # Fix SELinux context
+    if command -v restorecon >/dev/null 2>&1; then
+      restorecon -R /home || true
+    fi
+  args:
+    executable: /bin/bash
+
+- name: Clean up temp mount point
+  ansible.builtin.file:
+    path: /mnt/home_temp
+    state: absent

@@ -1,0 +1,43 @@
+# Note: /tmp is deliberately excluded here.  AL2023 already comes with /tmp being configured as tmpfs, so attempting to migrate
+# it will cause errors.  CIS guidance 1.1.2.1 (/tmp must be on separate partition) also accepts the use of tmpfs because
+# you can set "noexec" on it.  Simply run "findmnt -nk /tmp" to verify.
+directories:
+  home:
+    path: /home
+    lv: home-lv
+    fstab_entry: home--lv
+    size: 10%VG
+    opts: defaults,nofail,nodev
+  varlogaudit:
+    path: /var/log/audit
+    lv: varlogaudit-lv
+    fstab_entry: varlogaudit--lv
+    size: 10%VG
+    opts: defaults,nofail,nodev
+  varlog:
+    path: /var/log
+    lv: varlog-lv
+    fstab_entry: varlog--lv
+    size: 20%VG
+    opts: defaults,nofail,nodev
+  vartmp:
+    path: /var/tmp
+    lv: vartmp-lv
+    fstab_entry: vartmp--lv
+    size: 20%VG
+    opts: defaults,nodev
+  var:
+    path: /var
+    lv: var-lv
+    fstab_entry: var--lv
+    size: 40%VG
+    opts: defaults,nofail,nodev
+
+services:
+  - tuned
+  - rsyslog
+  - crond
+  - irqbalance
+  - polkit
+  - chronyd
+  - NetworkManager

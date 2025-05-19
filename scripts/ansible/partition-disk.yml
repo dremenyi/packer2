@@ -1,0 +1,78 @@
+---
+# Site level playbook
+- name: Prepare system for partitioning
+  hosts: 127.0.0.1
+  become: true
+  become_method: sudo
+  connection: ansible.builtin.local
+  gather_facts: true
+  vars:
+    ansible_remote_tmp: /tmp/ansible-remote
+    ansible_local_tmp: /tmp/ansible-local
+    ansible_user: ec2-user
+    ansible_python_interpreter: /opt/venv/ansible/bin/python3.11
+  pre_tasks:
+    - name: Create Ansible temporary directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0700'
+        owner: ec2-user
+      loop:
+        - "{{ ansible_remote_tmp }}"
+        - "{{ ansible_local_tmp }}"
+
+    - name: Install required packages
+      ansible.builtin.dnf:
+        name: 
+          - rsync
+        state: present
+      when: ansible_facts['distribution'] == 'Amazon'
+      register: rsync_install
+
+    - name: Ensure file in /var/tmp exists
+      ansible.builtin.file:
+        path: "/var/tmp/ansible_touch.txt"
+        state: touch
+      when: ansible_facts['distribution'] == 'Amazon'
+
+- name: Apply partitioning
+  hosts: 127.0.0.1
+  become: true
+  become_method: sudo
+  connection: ansible.builtin.local
+  gather_facts: true
+  vars:
+    ansible_remote_tmp: /tmp/ansible-remote
+    ansible_local_tmp: /tmp/ansible-local
+    ansible_user: ec2-user
+    ansible_python_interpreter: /opt/venv/ansible/bin/python3.11
+  roles:
+    - partition_disk
+
+- name: Cleanup after partitioning
+  hosts: 127.0.0.1
+  become: true
+  become_method: sudo
+  connection: ansible.builtin.local
+  gather_facts: true
+  vars:
+    ansible_remote_tmp: /tmp/ansible-remote
+    ansible_local_tmp: /tmp/ansible-local
+    ansible_user: ec2-user
+    ansible_python_interpreter: /opt/venv/ansible/bin/python3.11
+  tasks:
+    - name: Remove rsync package
+      ansible.builtin.dnf:
+        name: rsync
+        state: absent
+
+    - name: Clean DNF cache
+      ansible.builtin.command: dnf clean all
+      changed_when: true
+
+    - name: Ensure file in /var/tmp does not exist
+      ansible.builtin.file:
+        path: "/var/tmp/ansible_touch.txt"
+        state: absent
+      when: ansible_facts['distribution'] == 'Amazon'

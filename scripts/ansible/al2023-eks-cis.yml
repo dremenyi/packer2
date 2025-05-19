@@ -1,0 +1,40 @@
+---
+- hosts: 127.0.0.1
+  become: true
+  become_method: sudo
+  connection: local
+  gather_facts: true
+  tasks:
+    # Needed for EKS worker node
+    - name: Enable IPv4 Forwarding
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: true
+        state: present
+        reload: true
+        ignoreerrors: true
+      tags:
+        - always
+
+- hosts: 127.0.0.1
+  become: true
+  become_method: sudo
+  connection: local
+  gather_facts: true
+  vars:
+    amzn2023cis_rule_3_2_1: false # Kubernetes requires IPV4 forwarding on worker nodes
+  pre_tasks:
+    - name: Install Required python packages
+      ansible.builtin.pip:
+        name:
+          - passlib # Required to use ansible.builtin.password_hash
+
+    - name: Set random root password
+      ansible.builtin.user:
+        name: root
+        password: "{{ lookup('community.general.random_string', length=14, min_lower=1, min_upper=1, min_special=1, min_numeric=1) | ansible.builtin.password_hash('sha512') }}"
+      tags:
+        - always
+  roles:
+    - al2023_cis

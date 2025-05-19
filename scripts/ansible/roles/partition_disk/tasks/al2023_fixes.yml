@@ -1,0 +1,35 @@
+- name: AL2023 - Create al3.conf
+  ansible.builtin.template:
+    src: al3.conf.j2
+    dest: /etc/dracut.conf.d/al3.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# Note: The below may fail to apply properly if it is not inserted into the "devices {}" section inside of the curly braces.
+# If you see "use_devicesfile = 0" at the end of the file, then the Ansible task likely failed to put it in the correct place.
+# We depend on finding the commented line and changing that.  Further adjustments could be needed if the file content changes in the future.
+# One alternative might be to use "insertafter: devices {"
+- name: AL2023 - Enable use_devicesfile
+  ansible.builtin.lineinfile:
+    path: /etc/lvm/lvm.conf
+    regexp: "# use_devicesfile = 0"
+    line: use_devicesfile = 0
+
+- name: Create grub2
+  ansible.builtin.command:
+    cmd: grub2-mkconfig -o /boot/grub2/grub.cfg
+  register: create_grub2
+
+- name: Debug create_grub2
+  ansible.builtin.debug:
+    var: create_grub2
+
+- name: Update initramfs
+  ansible.builtin.command:
+    cmd: dracut --regenerate-all --force --verbose
+  register: update_initramfs
+
+- name: Debug update_initramfs
+  ansible.builtin.debug:
+    var: update_initramfs

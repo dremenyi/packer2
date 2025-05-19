@@ -1,0 +1,78 @@
+---
+- name: Make temp dir
+  ansible.builtin.file:
+    path: "/mnt{{ item.value.path }}"
+    state: directory
+    mode: "0755"
+    recurse: true
+
+- name: Mount temp dir
+  ansible.posix.mount:
+    path: "/mnt{{ item.value.path }}"
+    src: "/dev/mapper/disk2vg-{{ item.value.fstab_entry }}"
+    fstype: xfs
+    state: mounted
+
+- name: Debug loop item path
+  ansible.builtin.debug:
+    msg: "{{ item.value.path }}"
+
+- name: Ensure source directory exists
+  ansible.builtin.file:
+    path: "{{ item.value.path }}"
+    state: directory
+    mode: "0755"
+  when: not ansible_check_mode
+
+- name: Stop processes using directory
+  ansible.builtin.shell: |
+    fuser -k "{{ item.value.path }}" || true
+  args:
+    executable: /bin/bash
+  changed_when: false
+
+- name: Shell copy files
+  ansible.builtin.shell: "cp -Raxnv {{ item.value.path }}/* /mnt{{ item.value.path }}"
+  register: copy
+  changed_when: copy.stdout is defined
+  failed_when: false
+
+- name: Move files
+  ansible.builtin.shell: "mv {{ item.value.path }} {{ item.value.path }}-old"
+  register: move
+  changed_when: move.rc == 0
+  failed_when: false
+
+- name: Unmount temp dir
+  ansible.posix.mount:
+    path: "/mnt{{ item.value.path }}"
+    state: unmounted
+
+- name: Create folder with parent directories
+  ansible.builtin.shell: |
+    mkdir -p "{{ item.value.path }}"
+    chmod 755 "{{ item.value.path }}"
+    chown root:root "{{ item.value.path }}"
+  args:
+    executable: /bin/bash
+
+- name: Add mount to fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "/dev/mapper/disk2vg-{{ item.value.fstab_entry }} {{ item.value.path }} xfs {{ item.value.opts }} 0 0"
+    state: present
+
+- name: Mount the volume
+  ansible.builtin.command: "mount {{ item.value.path }}"
+  register: mount_result
+  failed_when: mount_result.rc != 0 and 'already mounted' not in mount_result.stderr
+  changed_when: mount_result.rc == 0
+
+- name: Verify mount
+  ansible.builtin.shell: |
+    mountpoint -q "{{ item.value.path }}" || {
+      echo "Mount failed for {{ item.value.path }}"
+      exit 1
+    }
+  args:
+    executable: /bin/bash
